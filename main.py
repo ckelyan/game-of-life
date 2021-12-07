@@ -13,19 +13,6 @@ with open("presets.json", "r") as f:
 with open("fullpresets.json", "r") as f:
     fpresets = json.load(f)
 
-def neighbors(matrix, rowNumber, colNumber):
-    result = []
-    for rowAdd in range(-1, 2):
-        newRow = rowNumber + rowAdd
-        if newRow >= 0 and newRow <= len(matrix)-1:
-            for colAdd in range(-1, 2):
-                newCol = colNumber + colAdd
-                if newCol >= 0 and newCol <= len(matrix)-1:
-                    if newCol == colNumber and newRow == rowNumber:
-                        continue
-                    result.append(matrix[newCol][newRow])
-    return len([1 for i in result if i != 0])
-
 class Life:
     def __init__(self, s=100, p=False, preset=None, fpreset=None):
         self.p = p
@@ -43,17 +30,30 @@ class Life:
             self.grid = fpresets[fpreset]
             self.s = len(self.grid[0])
 
-    @staticmethod
+    # @staticmethod
     def delall():
         dir = 'imgs'
         for f in os.listdir(dir):
             os.remove(os.path.join(dir, f))
 
+    def neighbors(self, matrix, rowNumber, colNumber):
+        result = []
+        for rowAdd in range(-1, 2):
+            newRow = rowNumber + rowAdd
+            if newRow >= 0 and newRow <= len(matrix)-1:
+                for colAdd in range(-1, 2):
+                    newCol = colNumber + colAdd
+                    if newCol >= 0 and newCol <= len(matrix)-1:
+                        if newCol == colNumber and newRow == rowNumber:
+                            continue
+                        result.append(matrix[newCol][newRow])
+        return len([1 for i in result if i != 0])
+
     def next(self):
         new = [[0 for _ in range(self.s)] for _ in range(self.s)]
         for i1 in range(self.s):
             for i2 in range(self.s):
-                n = neighbors(self.grid, i2, i1)
+                n = self.neighbors(self.grid, i2, i1)
                 if self.grid[i1][i2]:
                     
                     if n < 2 or n > 3:
@@ -98,8 +98,9 @@ class Life:
         plt.xticks([])
         plt.yticks([])
         plt.xlabel(f'frame {i}')
-        o = plt.imshow(g, interpolation='none', cmap='Greys')
+        plt.imshow(g, interpolation='none', cmap='Greys')
         plt.savefig(f'imgs/fig{i:03}.png')
+        plt.clf()
 
 def imgif(speed=0.4):
     file_names = sorted(('imgs/'+fn for fn in os.listdir('imgs/') if fn.endswith('.png')))
@@ -118,7 +119,7 @@ def imgif(speed=0.4):
 def main(maxFrames=100):
     lastLast = None
     last = None        
-    l = Life(p=False, fpreset="glidergun")
+    l = Life(p=False, fpreset="salut")
     for i in range(maxFrames):
         l.saveplot(i)
         n = l.next()
@@ -133,12 +134,13 @@ def main(maxFrames=100):
     else:
         print(f"Maximum frames reached ({maxFrames})")
 
-try: 
-    main(100)
-except Exception as e:
-    print("Saving...")
-    print(e)
-finally: 
-    imgif(speed=0.1)
-    Life.delall()
-    
+if __name__ == "__main__":
+    try: 
+        main(100)
+    except Exception as e:
+        print("Saving...")
+        print(e)
+    finally: 
+        imgif(speed=0.1)
+        # Life.delall()
+        
