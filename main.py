@@ -1,76 +1,156 @@
 import os
+import sys
 import json
+import shutil
 import random
-import imageio
+import warnings
+import functools
 import numpy as np
-from PIL import Image
-from time import sleep
+import imageio.v2 as imageio
 from matplotlib import pyplot as plt
+from typing import Union
 
-with open("presets.json", "r") as f:
-    presets = json.load(f)
+# constants
+DEFAULT_PRESET_FILE = 'presets.json'
+PAT_NAME = sys.argv[1] if len(sys.argv) > 1 else None
+IMG_PATH = '.imgs'
 
-with open("fullpresets.json", "r") as f:
-    fpresets = json.load(f)
+if not os.path.exists(IMG_PATH):
+    os.mkdir(IMG_PATH)
 
 class Life:
-    def __init__(self, s=100, p=False, preset=None, fpreset=None):
-        self.p = p
-        self.s = s
+    def __init__(self, preset: Union[np.ndarray, list, tuple, str]=None, show_plot: bool=False, grid_size: int=100) -> None:
+        """Life initializer
+
+        Args:
+            preset (Union[np.ndarray, list, tuple, str], optional): Either the name of the preset in the presets file, or the matrix directly. If None, an random matrix will be created. Defaults to None.
+            show_plot (bool, optional): Tells whether or not each frame should be shown in a window. Defaults to False.
+            grid_size (int, optional): If preset is empty, the size of the random grid. Won't be used otherwise. Defaults to 100.
+        """
         
-        if not (preset or fpreset):
-            self.grid = [[1 if i in random.sample(range(s), int(s/(s/3))) else 0 for i in range(s)] for _ in range(s)]
-        elif preset in presets.keys(): #TODO: probably not working
-            grid = np.zeros((s, s), dtype=int)
-            pta = np.array(presets[preset]).reshape(3, 3)
-            r, c = 50, 50
-            grid[r:r+pta.shape[0], s-c:c+pta.shape[1]] = pta # append the preset to a blank grid
-            self.grid = grid 
-        elif fpreset in fpresets.keys():
-            self.grid = fpresets[fpreset]
-            self.s = len(self.grid[0])
+        # boolean to tell whether or not it shows each frame as a pyplot with plt.show()
+        self.show_plot = show_plot
+        
+        # if preset is none, create a random grid
+        if not preset:
+            self.grid = [[1 if i in random.sample(range(grid_size), int(grid_size/(grid_size/3))) else 0 for i in range(grid_size)] for _ in range(grid_size)]
+        
+        else:
+            # if the preset is an ndarray, store it as-is
+            if type(preset) == np.ndarray:
+                self.grid = preset
+            
+            # if the preset is a list or a tuple, convert it to a ndarray
+            elif type(preset) in [list, tuple]:
+                self.grid = np.array(preset)
+            
+            # if the preset is a string, load it from the presets file
+            elif type(preset) == str:
+                # load the presets
+                with open("presets.json", "r") as f:
+                    presets = json.load(f)
 
-    # @staticmethod
-    def delall():
-        dir = 'imgs'
-        for f in os.listdir(dir):
-            os.remove(os.path.join(dir, f))
+                self.grid = np.array(presets[preset])
+        
+        # might make it possible to have a non-square grid
+        self.grid_size = len(self.grid)    
 
-    def neighbors(self, matrix, rowNumber, colNumber):
+    def DEPRECATED_neighbors(self, row: int, col: int) -> int:
+        # This implementation is unnecessarily slow and long, but it works and I like it so I'm leaving it in the code.
+        
+        """Get the amount of set neighbors of a cell
+
+        Args:
+            row (int): Row number of the cell
+            col (int): Col number of the cell
+
+        Returns:
+            int: Amount of neighbors
+        """
+        
         result = []
-        for rowAdd in range(-1, 2):
-            newRow = rowNumber + rowAdd
-            if newRow >= 0 and newRow <= len(matrix)-1:
-                for colAdd in range(-1, 2):
-                    newCol = colNumber + colAdd
-                    if newCol >= 0 and newCol <= len(matrix)-1:
-                        if newCol == colNumber and newRow == rowNumber:
+        # -1, 0, 1 (left, same, right)
+        for rAddend in range(-1, 2):
+            # to find the row it's going to check (first row-1, then row, then row+1)
+            new_row = row + rAddend
+            # if new_row is in bounds
+            if len(self.grid)-1 >= new_row >= 0:
+                # repeat for cols
+                for cAddend in range(-1, 2):
+                    new_col = col + cAddend
+                    if new_col >= 0 and new_col <= len(self.grid)-1:
+                        # skip if it's the center cell
+                        if new_col == col and new_row == row:
                             continue
-                        result.append(matrix[newCol][newRow])
-        return len([1 for i in result if i != 0])
+                        # else add the cell to the result
+                        result.append(self.grid[new_row, new_col])
 
-    def next(self):
-        new = [[0 for _ in range(self.s)] for _ in range(self.s)]
-        for i1 in range(self.s):
-            for i2 in range(self.s):
-                n = self.neighbors(self.grid, i2, i1)
-                if self.grid[i1][i2]:
-                    
-                    if n < 2 or n > 3:
-                        new[i1][i2] = 0
+        # all we really need is the amount of set neighbors and since the matrix is binary we can just use the sum
+        return sum(result)
+
+    def neighbors(self, row: int, col: int) -> int:
+        """Function to get the amount of set neighbors of a cell. This implementation works since if a value is not 0 it's always 1, which means we can get the amount by getting their sum.
+
+        Args:
+            row (int): Row number of the cell
+            col (int): Col number of the cell
+
+        Returns:
+            int: Amount of set neighbors
+        """
+        
+        # get the sum of the neighbors, which correspons to the amount of set neighbors since they're always 0 or 1, then subtract the one in the center.
+        return np.sum(self.grid[row-1:row+2, col-1:col+2]) - self.grid[row, col]
+
+    def next(self) -> bool:
+        """Generate the next frame of the game
+
+        Returns:
+            bool: Has changed
+        """
+
+        new_grid = np.zeros((self.grid_size, self.grid_size))
+        
+        for i1 in range(self.grid_size):
+            for i2 in range(self.grid_size):
+                # get the amount of neighbors for each cell
+                amnt_neighbors = self.neighbors(i2, i1)
+                
+                # if the cell is alive
+                if self.grid[i1, i2]:
+                    # if it has less than 2 or more than 3 neighbors, it dies
+                    if amnt_neighbors < 2 or amnt_neighbors > 3:
+                        new_grid[i1, i2] = 0
+
+                    # otherwise it lives
                     else:
-                        new[i1][i2] = 1
+                        new_grid[i1, i2] = 1
+
                 else:
-                    if n == 3:
-                        new[i1][i2] = 1
+                    # if the cell is dead and has exactly 3 neighbors, it comes to life
+                    if amnt_neighbors == 3:
+                        new_grid[i1, i2] = 1
 
-        return new
+        # show the plot if it's supposed to
+        if self.show_plot:
+            self.plotgrid()
 
-    def update(self, newg):
-        self.grid = newg
-        if self.p: self.plotgrid()
+        # if the grid has changed, return False
+        if np.array_equal(self.grid, new_grid):
+            return False
+        
+        # otherwise update the grid and return True
+        self.grid = new_grid
+        return True
 
-    def print_grid(self):
+    def isalive(self) -> bool:
+        """Check if there are any alive cells"""
+
+        return np.any(self.grid)
+
+    def print_grid(self) -> None:
+        """Print the grid to the console"""
+        
         for i in self.grid:
             for j in i:
                 if j:
@@ -79,68 +159,76 @@ class Life:
                     print("  ", end="")
             print()
      
-    def plotgrid(self):
-        g = np.array(self.grid.copy())
-        g = np.invert(g)
-        o = plt.imshow(g, interpolation='none', cmap='Greys')
-        plt.show()
-            
-    def isalive(self):
-        for i in self.grid:
-           if 1 in i:
-               return True
-               
-        return False
+    def plotgrid(self) -> None:
+        """Plot the grid with plt.show()"""
 
-    def saveplot(self, i):
-        g = np.array(self.grid.copy())
-        g = np.invert(g)
+        # flip each bits because white for alive and black for dead looks better
+        grid = np.invert(np.array(self.grid.copy()))
+        plt.imshow(grid, interpolation='none', cmap='Greys')
+        plt.show()
+
+    def saveplot(self, i: int) -> None:
+        # same as plotgrid
+        grid = np.invert(np.array(self.grid.copy()))
+        # the ticks are irrelevant
         plt.xticks([])
         plt.yticks([])
+        # set the xlabel as the frame number
         plt.xlabel(f'frame {i}')
-        plt.imshow(g, interpolation='none', cmap='Greys')
-        plt.savefig(f'imgs/fig{i:03}.png')
+        plt.imshow(grid, interpolation='none', cmap='Greys')
+        # save the plot as an image in the IMG_PATH folder
+        plt.savefig(f'{IMG_PATH}/fig{i:03}.png')
+        # clear the figure
         plt.clf()
 
-def imgif(speed=0.4):
-    file_names = sorted(('imgs/'+fn for fn in os.listdir('imgs/') if fn.endswith('.png')))
 
-    # images = [Image.open(fn) for fn in file_names]
+def imgif(speed: float=0.4) -> None:
+    """Create a gif from the images in the IMG_PATH folder in ./out
+
+    Args:
+        speed (float): Time in s of the each frame in the gif
+    """
+    
+    # sort the files in the IMG_PATH folder by the trailing numbers in their names.
+    # Apparently it works as-is, no need to indicate the sorting key. Probably because the numbers are of fixed length.
+    file_names = sorted((f'{IMG_PATH}/{fn}' for fn in os.listdir(f'{IMG_PATH}/') if fn.endswith('.png')))
+    # create image objects for each file
     images = [imageio.imread(fn) for fn in file_names]
 
-    unsortedGifs = list(fn[:-4] for fn in os.listdir('./out/') if fn.endswith('.gif'))
-    ls = sorted(unsortedGifs, key=lambda x: int(x[3:]))
-    last = int(ls[-1][3:]) if ls else 0
-    filename = f"out{last+1}.gif"
+    # get all the gif names in the out folder
+    unsorted_gifs = (fn[:-4] for fn in os.listdir('./out/') if fn.endswith('.gif'))
+    # sort them, now we have to add a key because the numbers are of different lengths
+    sorted_gifs = sorted(unsorted_gifs, key=lambda x: int(x[3:]))
+    # get the last one if there even is any and turn it into an int
+    last_n = int(sorted_gifs[-1][3:]) if sorted_gifs else 0
+    filename = f"out{last_n+1}.gif"
+    # write the gif to the out folder. duration is the time between each frame
     imageio.mimwrite("./out/"+filename, images, loop=1, duration=speed)
     print(f"Saved as {filename}")
     
-
-def main(maxFrames=100):
-    lastLast = None
-    last = None        
-    l = Life(p=False, fpreset="salut")
-    for i in range(maxFrames):
-        l.saveplot(i)
-        n = l.next()
-        if n == last or n == lastLast:
-            print(f"Stuck at frame {i}")
-            break
-        last = n
+# main function
+def generate(max_frames=100):
+    life = Life(preset=PAT_NAME)
+    
+    for i in range(max_frames):
+        print("Generating frame", i, end="\r")
         
-        l.update(n)
-        if not l.isalive(): print(f'Died at frame {i}'); break
-        print("Generating frame", i)
+        life.saveplot(i)
+        
+        # life.next returns False if the grid has not changed, that is, if nothing is going to be changing anymore
+        if not life.next():
+            break
+        
+        if not life.isalive():
+            print(f'\nDied at frame {i}')
+            break
+        
     else:
-        print(f"Maximum frames reached ({maxFrames})")
+        print(f"Maximum frames reached ({max_frames})")
 
 if __name__ == "__main__":
-    try: 
-        main(100)
-    except Exception as e:
-        print("Saving...")
-        print(e)
-    finally: 
-        imgif(speed=0.1)
-        # Life.delall()
-        
+    generate(200)
+    imgif(speed=0.1)
+    
+    # delete the temporary image folder
+    shutil.rmtree(IMG_PATH)
