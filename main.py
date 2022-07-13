@@ -3,8 +3,6 @@ import sys
 import json
 import shutil
 import random
-import warnings
-import functools
 import numpy as np
 import imageio.v2 as imageio
 from matplotlib import pyplot as plt
@@ -109,12 +107,12 @@ class Life:
             bool: Has changed
         """
 
-        new_grid = np.zeros((self.grid_size, self.grid_size))
+        new_grid = np.zeros((self.grid_size, self.grid_size), dtype=int)
         
         for i1 in range(self.grid_size):
             for i2 in range(self.grid_size):
                 # get the amount of neighbors for each cell
-                amnt_neighbors = self.neighbors(i2, i1)
+                amnt_neighbors = self.neighbors(i1, i2)
                 
                 # if the cell is alive
                 if self.grid[i1, i2]:
@@ -212,7 +210,7 @@ def generate(max_frames=100, preset:  Union[np.ndarray, list, tuple, str]=PAT_NA
     
     for i in range(max_frames):
         print("Generating frame", i, end="\r")
-        
+
         life.saveplot(i)
         
         # life.next returns False if the grid has not changed, that is, if nothing is going to be changing anymore
@@ -227,7 +225,7 @@ def generate(max_frames=100, preset:  Union[np.ndarray, list, tuple, str]=PAT_NA
         print(f"Maximum frames reached ({max_frames})")
 
 if __name__ == "__main__":
-    generate(200)
+    generate(500)
     imgif(speed=0.1)
     
     # delete the temporary image folder

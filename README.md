@@ -2,7 +2,7 @@
 This is my own attempt at recreating the famous 0-player Game of Life. It's using matplotlib to create images from a binary matrix, which are then used to create a gif.
 
 ## Example output (100 frames):
-![output](https://github.com/flexflower/Game-of-Life/blob/main/out/out12.gif "With preset 'glidergun'")
+![output](https://github.com/flexflower/Game-of-Life/blob/main/out/out1.gif "With preset 'glidergun'")
 
 # Usage
 ## With pcreate
