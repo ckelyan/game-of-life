@@ -47,7 +47,7 @@ class Life:
             # if the preset is a string, load it from the presets file
             elif type(preset) == str:
                 # load the presets
-                with open("presets.json", "r") as f:
+                with open(DEFAULT_PRESET_FILE, "r") as f:
                     presets = json.load(f)
 
                 self.grid = np.array(presets[preset])
@@ -207,8 +207,8 @@ def imgif(speed: float=0.4) -> None:
     print(f"Saved as {filename}")
     
 # main function
-def generate(max_frames=100):
-    life = Life(preset=PAT_NAME)
+def generate(max_frames=100, preset:  Union[np.ndarray, list, tuple, str]=PAT_NAME):
+    life = Life(preset=preset)
     
     for i in range(max_frames):
         print("Generating frame", i, end="\r")
