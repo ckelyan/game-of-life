@@ -14,7 +14,7 @@ Each one asks for 2 arguments:
 - patname (optional): the name of the pattern to be saved in this folder's preset JSON file. Defaults to "default"
 ```sh
 // windows
-start pcreate-bridge.bat <pcpath> <patname>
+pcreate-bridge.bat <pcpath> <patname>
 // *nix (macos, linux, etc)
 ./pcreate-bridge.sh <pcpath> <patname>
 // universal
