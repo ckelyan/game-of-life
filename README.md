@@ -6,7 +6,7 @@ This is my own attempt at recreating the famous 0-player Game of Life. It's usin
 
 # Usage
 ## With pcreate
-You can create presets using my other project [pcreate](https://github.com/flexflower/pcreate).
+You can create presets using my other project [pcreate](https://github.com/ckelyan/pcreate).
 
 You can use pcreate-bridge.* (sh for *nix, bat for Windows and py universal) to do the process automatically;
 Each one asks for 2 arguments:
